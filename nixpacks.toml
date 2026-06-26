@@ -1,2 +1,8 @@
 [phases.setup]
-nixPkgs = ["chromium", "chromium-sandbox"]
+nixPkgs = ["chromium"]
+
+[phases.install]
+cmds = ["npm install", "npx playwright install chromium"]
+
+[start]
+cmd = "node server.js"
