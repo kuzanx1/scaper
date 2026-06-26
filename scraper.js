@@ -644,7 +644,7 @@ const path = require('path')
 
 const browser = await puppeteer.launch({
   headless: true,
-  executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome-stable',
   userDataDir: path.join(__dirname, 'puppeteer-profile'),
   args: [
     '--no-sandbox',
