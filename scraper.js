@@ -188,8 +188,16 @@ await wait(CONFIG.waitAfterAll)
 // ============================================================
 //  faselhd باستخدام Playwright + persistent context
 // ============================================================
-const FASELHD_PROFILE = 'C:\\Users\\N\\folim-scraper\\faselhd-profile'
+const FASELHD_PROFILE = process.env.FASELHD_PROFILE || '/tmp/faselhd-profile'
+const PROXY_URL = process.env.PROXY_URL || 'https://joyfully-swimmable-flame.ngrok-free.dev'
 
+function wrapWithProxy(url) {
+  if (!url) return url
+  if (url.includes('scdns.io') || url.includes('faselhdx')) {
+    return `${PROXY_URL}/proxy?url=${encodeURIComponent(url)}`
+  }
+  return url
+}
 async function searchFaselHD(title, year, seasonNum, episodeNum) {
   const query = cleanTitleForSearch(title, null)
   const searchUrl = `https://web6260xx.faselhdx.xyz/?s=${encodeURIComponent(query)}`
@@ -501,7 +509,7 @@ async function updateServersInSupabase(titleId, episodeId, m3u8Results) {
   const { data: existing } = await q
 
   for (let i = 0; i < m3u8Results.length; i++) {
-    const newUrl = m3u8Results[i].url
+    const newUrl = wrapWithProxy(m3u8Results[i].url)
     if (existing && existing[i]) {
       await supabase.from('servers')
         .update({ server_url: newUrl, updated_at: new Date().toISOString() })
