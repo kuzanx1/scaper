@@ -644,8 +644,6 @@ const path = require('path')
 
 const browser = await puppeteer.launch({
   headless: true,
-executablePath: process.env.CHROME_PATH || puppeteer.executablePath(),
-  userDataDir: path.join(__dirname, 'puppeteer-profile'),
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
