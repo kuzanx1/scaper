@@ -192,26 +192,25 @@ const FASELHD_PROFILE = 'C:\\Users\\N\\folim-scraper\\faselhd-profile'
 
 async function searchFaselHD(title, year, seasonNum, episodeNum) {
   const query = cleanTitleForSearch(title, null)
-
   const searchUrl = `https://web6260xx.faselhdx.xyz/?s=${encodeURIComponent(query)}`
 
   log.info(`[faselhd] يبحث عن: "${title}"`)
 
   const { chromium } = require('playwright')
+  const context = await chromium.launchPersistentContext(FASELHD_PROFILE, {
+    headless: true,
+    args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+  })
+
   const page = await context.newPage()
   const m3u8List = []
   const allRequests = []
 
   page.on('request', req => allRequests.push(req.url()))
-
   page.on('response', async (response) => {
     try {
       const url = response.url()
-      if (
-        url.includes('.m3u8') &&
-        !url.includes('index-v1-a1.m3u8') &&
-        response.status() >= 200 && response.status() < 400
-      ) {
+      if (url.includes('.m3u8') && !url.includes('index-v1-a1.m3u8') && !url.includes('jwpltx.com') && response.status() >= 200) {
         m3u8List.push({ url })
         log.info(`[faselhd] m3u8: ${url.slice(0, 80)}`)
       }
@@ -224,10 +223,12 @@ async function searchFaselHD(title, year, seasonNum, episodeNum) {
 
     const isChallenge = await page.locator('text=Cloudflare').count().catch(() => 0)
     if (isChallenge) {
-      log.warn(`[faselhd] Cloudflare — انتظر حتى تتجاوزه يدوياً...`)
-      await page.waitForTimeout(60000)
-      log.info(`[faselhd] متابعة...`)
-    }const resultUrl = await page.evaluate(({ t, isEpisode }) => {
+      log.warn(`[faselhd] Cloudflare — تخطي`)
+      await context.close()
+      return []
+    }
+
+    const resultUrl = await page.evaluate(({ t, isEpisode }) => {
       const tLower = t.toLowerCase()
       const tWords = tLower.split(' ').filter(w => w.length > 2)
       for (const a of document.querySelectorAll('a[href*="/movies/"], a[href*="/series/"]')) {
@@ -245,82 +246,48 @@ async function searchFaselHD(title, year, seasonNum, episodeNum) {
 
     if (!resultUrl) {
       log.warn(`[faselhd] ما لقى: "${title}"`)
-      log.info(`[faselhd] الروابط الموجودة: ${allRequests.filter(u => !u.includes('google')).slice(0, 10).join('\n')}`)
       await context.close()
       return []
     }
 
     log.info(`[faselhd] وجد: ${resultUrl}`)
-    await page.goto(resultUrl, { waitUntil: 'networkidle', timeout: 20000 })
+    await page.goto(resultUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
     await page.waitForTimeout(5000)
 
-const serverItems = await page.$$('li[onclick*="player_iframe"]')
-log.info(`[faselhd] عدد السيرفرات: ${serverItems.length}`)
-for (const item of serverItems) {
-  try {
-    // استخرج الرابط من الـ onclick مباشرة
-    const onclickVal = await item.evaluate(el => el.getAttribute('onclick'))
-    const match = onclickVal?.match(/player_iframe\.location\.href\s*=\s*'([^']+)'/)
-    if (!match) continue
+    const serverItems = await page.$$('li[onclick*="player_iframe"]')
+    log.info(`[faselhd] عدد السيرفرات: ${serverItems.length}`)
 
-    const playerUrl = match[1]
-    log.info(`[faselhd] player url: ${playerUrl.slice(0, 80)}`)
-
-    const iPage = await context.newPage()
-    iPage.on('response', async (response) => {
-      try {
-        const url = response.url()
-        if (url.includes('.m3u8') && !url.includes('index-v1-a1.m3u8') && !url.includes('jwpltx.com') && response.status() >= 200) {
-          m3u8List.push({ url })
-          log.info(`[faselhd] m3u8: ${url.slice(0, 80)}`)
-        }
-      } catch {}
-    })
-    await iPage.goto(playerUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
-    await iPage.waitForTimeout(4000)
-    await iPage.close()
-
-  } catch {}
-}
     for (const item of serverItems) {
-  try {
-    await item.click()
-    await page.waitForTimeout(2000)
+      try {
+        const onclickVal = await item.evaluate(el => el.getAttribute('onclick'))
+        const match = onclickVal?.match(/player_iframe\.location\.href\s*=\s*'([^']+)'/)
+        if (!match) continue
 
-    const iframeSrc = await page.evaluate(() => {
-      const f = document.querySelector('iframe#player_iframe, iframe[name="player_iframe"]')
-      return f ? (f.src || f.getAttribute('src')) : null
-    })
+        const playerUrl = match[1]
+        log.info(`[faselhd] player url: ${playerUrl.slice(0, 80)}`)
 
-    if (iframeSrc) {
-      log.info(`[faselhd] iframe src: ${iframeSrc}`)
-      const iPage = await context.newPage()
-      iPage.on('response', async (response) => {
-        try {
-          const url = response.url()
-          if (url.includes('.m3u8') && !url.includes('index-v1-a1.m3u8') && !url.includes('jwpltx.com') && response.status() >= 200) {
-            m3u8List.push({ url })
-            log.info(`[faselhd] m3u8: ${url.slice(0, 80)}`)
-          }
-        } catch {}
-      })
-      await iPage.goto(iframeSrc, { waitUntil: 'domcontentloaded', timeout: 15000 })
-      await iPage.waitForTimeout(4000)
-      await iPage.close()
+        const iPage = await context.newPage()
+        iPage.on('response', async (response) => {
+          try {
+            const url = response.url()
+            if (url.includes('.m3u8') && !url.includes('index-v1-a1.m3u8') && !url.includes('jwpltx.com') && response.status() >= 200) {
+              m3u8List.push({ url })
+              log.info(`[faselhd] m3u8: ${url.slice(0, 80)}`)
+            }
+          } catch {}
+        })
+        await iPage.goto(playerUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
+        await iPage.waitForTimeout(4000)
+        await iPage.close()
+      } catch {}
     }
-  } catch {}
-}
+
     await page.waitForTimeout(1500)
 
     if (m3u8List.length) {
       log.success(`[faselhd] ${m3u8List.length} m3u8 <- ${title}`)
     } else {
       log.warn(`[faselhd] ما طلع m3u8: "${title}"`)
-      log.info(`[faselhd] الروابط اللي التقطها:`)
-      allRequests
-        .filter(u => !u.includes('google') && !u.includes('facebook') && !u.includes('cloudflare'))
-        .slice(0, 30)
-        .forEach(u => log.info(`  ${u.slice(0, 120)}`))
     }
 
     await context.close()
@@ -615,7 +582,6 @@ if (allResults.length === 0) {
   }
 log.info(`[debug] allResults: ${JSON.stringify(allResults)}`)
 await updateServersInSupabase(titleId, episodeId, allResults)
-  await updateServersInSupabase(titleId, episodeId, allResults)
   return true
 }
 
