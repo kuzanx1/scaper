@@ -1,6 +1,12 @@
 // src/runScheduledCheck.js
 require('dotenv').config()
-
+const { execSync } = require('child_process')
+try {
+  const path = execSync('which chromium || which chromium-browser || which google-chrome || find /nix -name chromium 2>/dev/null | head -1').toString().trim()
+  log.info(`Chrome path: ${path}`)
+} catch(e) {
+  log.error(`ما لقى chrome: ${e.message}`)
+}
 const { log, CONFIG, sortByYear, groupExpiredByTitle } = require('./config')
 const { createRunReporter } = require('./reporter')
 const { getExpiredServers, refreshTitle, launchMainBrowser } = require('./resolver')
