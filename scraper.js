@@ -198,12 +198,6 @@ async function searchFaselHD(title, year, seasonNum, episodeNum) {
   log.info(`[faselhd] يبحث عن: "${title}"`)
 
   const { chromium } = require('playwright')
-  const context = await chromium.launchPersistentContext(FASELHD_PROFILE, {
-    channel: 'chrome',
-    headless: false,
-    args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-  })
-
   const page = await context.newPage()
   const m3u8List = []
   const allRequests = []
